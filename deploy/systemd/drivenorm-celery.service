@@ -1,0 +1,15 @@
+[Unit]
+Description=Drive Norm - Celery (worker + beat: expira propostas de corrida)
+After=network.target postgresql.service redis-server.service
+Requires=postgresql.service redis-server.service
+
+[Service]
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/drive/backend
+ExecStart=/drive/venv/bin/celery -A drive_norm worker -B -l info --concurrency=2 --schedule=/drive/backend/celerybeat-schedule
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

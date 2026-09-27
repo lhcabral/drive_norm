@@ -61,33 +61,28 @@ sudo chown ubuntu:ubuntu /drive
 exit
 ```
 
-## 5. Enviar o código (na sua máquina)
+## 5. Clonar o código do GitHub (no servidor)
 
-Na pasta do projeto (`drive_norm/`):
+Clone **direto em `/drive`**, informando o destino no fim do comando. Se rodar só `git clone <url>`
+dentro de `/drive`, o Git cria `/drive/drive_norm/` e os scripts não encontram os arquivos.
 
 ```bash
-rsync -avz --delete \
-  -e "ssh -i ~/.ssh/SUA_CHAVE" \
-  --exclude 'venv/' \
-  --exclude '.env' \
-  --exclude '__pycache__/' \
-  --exclude 'frontend/node_modules/' \
-  --exclude 'frontend/dist/' \
-  --exclude 'backend/db.sqlite3' \
-  --exclude 'backend/media/' \
-  --exclude 'backend/staticfiles/' \
-  --exclude 'backend/celerybeat-schedule*' \
-  --exclude 'WhatsApp Image*' \
-  ./ ubuntu@IP_PUBLICO:/drive/
+ssh -i ~/.ssh/SUA_CHAVE ubuntu@IP_PUBLICO
+git clone https://github.com/lhcabral/drive_norm.git /drive
+ls /drive/deploy/systemd   # deve listar drivenorm-daphne.service e drivenorm-celery.service
 ```
 
-Os itens excluídos nunca são apagados no servidor, então o `.env`, o `venv` e as imagens enviadas pelo
-painel ficam preservados nas próximas atualizações.
+Se o repositório for privado, o Git pede usuário e senha. Use um
+[Personal Access Token](https://github.com/settings/tokens) como senha, ou cadastre uma
+*deploy key* do servidor em *Settings → Deploy keys* do repositório e clone por
+`git@github.com:lhcabral/drive_norm.git`.
+
+`.env`, `venv/`, `node_modules/`, `dist/`, `media/` e `staticfiles/` estão no `.gitignore`, então o
+`git pull` das atualizações não mexe neles.
 
 ## 6. Criar o `/drive/.env`
 
 ```bash
-ssh -i ~/.ssh/SUA_CHAVE ubuntu@IP_PUBLICO
 cd /drive
 cp deploy/.env.production .env
 sed -i "s|TROCAR_CHAVE_SECRETA|$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')|" .env
@@ -134,10 +129,10 @@ Sem token, o PIX fica **desativado** em produção.
 
 ## Atualizar o sistema
 
-Na sua máquina, rode o mesmo `rsync` do passo 5 e depois:
+Faça `git push` na sua máquina e depois, no servidor:
 
 ```bash
-ssh -i ~/.ssh/SUA_CHAVE ubuntu@IP_PUBLICO "bash /drive/deploy/deploy.sh"
+cd /drive && git pull && bash deploy/deploy.sh
 ```
 
 Se mudar `deploy/nginx/drivenorm.conf` ou os arquivos de `deploy/systemd/`, copie de novo para

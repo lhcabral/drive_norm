@@ -7,12 +7,41 @@ set -euo pipefail
 APP_DIR=/drive
 ENV_FILE="$APP_DIR/.env"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "$SCRIPT_DIR" != "$APP_DIR/deploy" ]]; then
+  echo "ERRO: o projeto precisa estar direto em $APP_DIR, mas este script está em $SCRIPT_DIR." >&2
+  echo "Clone com: git clone https://github.com/lhcabral/drive_norm.git $APP_DIR" >&2
+  exit 1
+fi
+
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "ERRO: $ENV_FILE não existe. Copie deploy/.env.production para $ENV_FILE e preencha." >&2
   exit 1
 fi
 if grep -q "TROCAR_" "$ENV_FILE"; then
   echo "ERRO: ainda há valores TROCAR_* em $ENV_FILE." >&2
+  exit 1
+fi
+
+missing=0
+for f in \
+  deploy/deploy.sh \
+  deploy/nginx/drivenorm.conf \
+  deploy/systemd/drivenorm-daphne.service \
+  deploy/systemd/drivenorm-celery.service \
+  backend/manage.py \
+  backend/requirements.txt \
+  frontend/package.json \
+  frontend/package-lock.json \
+  frontend/.env.production \
+  landing/index.html; do
+  if [[ ! -f "$APP_DIR/$f" ]]; then
+    echo "ERRO: arquivo ausente: $APP_DIR/$f" >&2
+    missing=1
+  fi
+done
+if [[ "$missing" -ne 0 ]]; then
+  echo "Envie o projeto completo para $APP_DIR (veja o passo 5 do deploy/DEPLOY.md) e rode de novo." >&2
   exit 1
 fi
 

@@ -8,6 +8,7 @@ from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -24,12 +25,15 @@ from wallet.serializers import LedgerEntrySerializer
 
 from .serializers import (
     AdminClientSerializer,
+    AdminCreateSerializer,
     AdminDriverSerializer,
     AdminPaymentSerializer,
+    AdminUserSerializer,
     DriverCreateSerializer,
     PixSettingsSerializer,
     SetPasswordSerializer,
     WalletOperationSerializer,
+    can_manage_account,
 )
 
 User = get_user_model()
@@ -192,16 +196,18 @@ class ClientWalletView(APIView):
         )
 
 
-def managed_user(pk):
-    """Clientes e motoristas; contas de admin não são alteradas pelo painel."""
-    return get_object_or_404(User, pk=pk, role__in=[User.Role.CLIENT, User.Role.DRIVER], is_staff=False)
+def managed_user(request, pk):
+    user = get_object_or_404(User, pk=pk)
+    if not can_manage_account(request.user, user):
+        raise PermissionDenied("Apenas superusuários podem alterar esta conta.")
+    return user
 
 
 class UserSetPasswordView(APIView):
     permission_classes = [IsSiteAdmin]
 
     def post(self, request, pk):
-        user = managed_user(pk)
+        user = managed_user(request, pk)
         serializer = SetPasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         password = serializer.validated_data.get("password") or generate_password()
@@ -216,7 +222,7 @@ class UserSendResetEmailView(APIView):
     permission_classes = [IsSiteAdmin]
 
     def post(self, request, pk):
-        user = managed_user(pk)
+        user = managed_user(request, pk)
         if not user.email:
             return Response(
                 {"detail": "Esta conta não tem e-mail cadastrado. Defina uma nova senha manualmente."},
@@ -261,6 +267,44 @@ class DriverDetailView(generics.RetrieveUpdateAPIView):
 
     def get_queryset(self):
         return drivers_queryset()
+
+
+def admins_queryset():
+    return User.objects.filter(role=User.Role.ADMIN).order_by("-is_superuser", "full_name", "username")
+
+
+class AdminUserListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsSiteAdmin]
+    pagination_class = AdminPagination
+
+    def get_serializer_class(self):
+        return AdminCreateSerializer if self.request.method == "POST" else AdminUserSerializer
+
+    def get_queryset(self):
+        return search_filter(admins_queryset(), self.request.query_params.get("search"))
+
+    def create(self, request, *args, **kwargs):
+        serializer = AdminCreateSerializer(data=request.data, context=self.get_serializer_context())
+        serializer.is_valid(raise_exception=True)
+        admin_user = serializer.save()
+        return Response(
+            AdminUserSerializer(admin_user, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class AdminUserDetailView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsSiteAdmin]
+    serializer_class = AdminUserSerializer
+    http_method_names = ["get", "patch"]
+
+    def get_queryset(self):
+        return admins_queryset()
+
+    def perform_update(self, serializer):
+        if not can_manage_account(self.request.user, serializer.instance):
+            raise PermissionDenied("Apenas superusuários podem alterar esta conta.")
+        serializer.save()
 
 
 class PaymentListView(generics.ListAPIView):

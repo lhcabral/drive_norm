@@ -90,10 +90,20 @@ class PasswordTests(BackofficeTestCase):
         self.client_user.refresh_from_db()
         self.assertTrue(self.client_user.check_password(generated))
 
-    def test_cannot_change_admin_password(self):
+    def test_admin_password_rules(self):
         other_admin = User.objects.create_user("adm2", password="x12345", role=User.Role.ADMIN)
         response = self.client.post(f"/api/admin/users/{other_admin.id}/password/", {}, format="json")
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 200)
+
+        root = User.objects.create_superuser("root", "", "x12345", role=User.Role.ADMIN)
+        response = self.client.post(f"/api/admin/users/{root.id}/password/", {}, format="json")
+        self.assertEqual(response.status_code, 403)
+        root.refresh_from_db()
+        self.assertTrue(root.check_password("x12345"))
+
+        self.client.force_authenticate(root)
+        response = self.client.post(f"/api/admin/users/{root.id}/password/", {}, format="json")
+        self.assertEqual(response.status_code, 200)
 
     def test_send_reset_email_requires_email(self):
         url = f"/api/admin/users/{self.client_user.id}/password-email/"
@@ -140,6 +150,83 @@ class DriverTests(BackofficeTestCase):
         self.driver.refresh_from_db()
         self.assertEqual(self.driver.driver_profile.vehicle_info, "HB20 prata")
         self.assertFalse(self.driver.is_active)
+
+
+class AdminUserTests(BackofficeTestCase):
+    def setUp(self):
+        super().setUp()
+        self.root = User.objects.create_superuser("root", "root@exemplo.com", "x12345", role=User.Role.ADMIN)
+
+    def test_list_only_admins(self):
+        results = self.client.get("/api/admin/admins/").json()["results"]
+        self.assertEqual({a["username"] for a in results}, {"adm", "root"})
+        by_name = {a["username"]: a for a in results}
+        self.assertTrue(by_name["adm"]["is_self"])
+        self.assertFalse(by_name["root"]["can_edit"])
+
+    def test_create_admin(self):
+        response = self.client.post(
+            "/api/admin/admins/",
+            {"username": "maria", "password": "senha123", "full_name": "Maria Admin", "email": "m@x.com"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        maria = User.objects.get(username="maria")
+        self.assertEqual(maria.role, User.Role.ADMIN)
+        self.assertFalse(maria.is_staff)
+        self.assertTrue(maria.check_password("senha123"))
+        self.assertFalse(hasattr(maria, "client_profile"))
+
+    def test_only_superuser_grants_full_access(self):
+        payload = {"username": "joao", "password": "senha123", "full_name": "João", "is_superuser": True}
+        response = self.client.post("/api/admin/admins/", payload, format="json")
+        self.assertEqual(response.status_code, 400)
+
+        self.client.force_authenticate(self.root)
+        response = self.client.post("/api/admin/admins/", payload, format="json")
+        self.assertEqual(response.status_code, 201)
+        joao = User.objects.get(username="joao")
+        self.assertTrue(joao.is_superuser and joao.is_staff)
+
+    def test_edit_and_block_admin(self):
+        other = User.objects.create_user("adm2", password="x12345", role=User.Role.ADMIN)
+        response = self.client.patch(
+            f"/api/admin/admins/{other.id}/", {"email": "novo@x.com", "is_active": False}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        other.refresh_from_db()
+        self.assertEqual(other.email, "novo@x.com")
+        self.assertFalse(other.is_active)
+
+    def test_cannot_block_self_or_change_own_level(self):
+        response = self.client.patch(f"/api/admin/admins/{self.admin.id}/", {"is_active": False}, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.client.force_authenticate(self.root)
+        response = self.client.patch(f"/api/admin/admins/{self.root.id}/", {"is_superuser": False}, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.root.refresh_from_db()
+        self.assertTrue(self.root.is_superuser)
+
+    def test_regular_admin_cannot_touch_superuser(self):
+        response = self.client.patch(f"/api/admin/admins/{self.root.id}/", {"is_active": False}, format="json")
+        self.assertEqual(response.status_code, 403)
+        self.root.refresh_from_db()
+        self.assertTrue(self.root.is_active)
+
+    def test_superuser_can_promote_and_demote(self):
+        self.client.force_authenticate(self.root)
+        url = f"/api/admin/admins/{self.admin.id}/"
+        self.client.patch(url, {"is_superuser": True}, format="json")
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.is_superuser and self.admin.is_staff)
+        self.client.patch(url, {"is_superuser": False}, format="json")
+        self.admin.refresh_from_db()
+        self.assertFalse(self.admin.is_superuser or self.admin.is_staff)
+
+    def test_clients_and_drivers_cannot_list_admins(self):
+        for user in (self.client_user, self.driver):
+            self.client.force_authenticate(user)
+            self.assertEqual(self.client.get("/api/admin/admins/").status_code, 403)
 
 
 @override_settings(MERCADOPAGO_ACCESS_TOKEN="", DEBUG=False)

@@ -152,6 +152,9 @@ O que roda no servidor:
       Motoristas         cadastro e edição dos motoristas
       PIX e pagamentos   token do Mercado Pago e lista de recargas
       Landing page       editor do site drivenorm.com.br
+      Administradores    criar admins, editar e-mail, trocar senha e
+                         bloquear. Contas com "acesso total" só podem ser
+                         alteradas por outro admin com acesso total
 
 
 3) CONFIGURAR O PIX (MERCADO PAGO)

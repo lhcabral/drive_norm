@@ -180,6 +180,21 @@ export type AdminDriver = {
   rides_total: string
 }
 
+export type AdminUser = {
+  id: number
+  username: string
+  full_name: string
+  display_name: string
+  email: string
+  phone: string
+  is_active: boolean
+  is_superuser: boolean
+  date_joined: string
+  last_login: string | null
+  is_self: boolean
+  can_edit: boolean
+}
+
 export type PixMode = 'mercadopago' | 'simulated' | 'disabled'
 
 export type PixSettings = {

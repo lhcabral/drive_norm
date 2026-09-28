@@ -99,6 +99,83 @@ class DriverCreateSerializer(serializers.ModelSerializer):
         return user
 
 
+def can_manage_account(actor, target) -> bool:
+    """Contas com acesso ao Django admin só podem ser alteradas por superusuários."""
+    return actor.is_superuser or not (target.is_superuser or target.is_staff)
+
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    is_superuser = serializers.BooleanField(required=False)
+    is_self = serializers.SerializerMethodField()
+    can_edit = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "username",
+            "full_name",
+            "display_name",
+            "email",
+            "phone",
+            "is_active",
+            "is_superuser",
+            "date_joined",
+            "last_login",
+            "is_self",
+            "can_edit",
+        )
+        read_only_fields = ("id", "username", "display_name", "date_joined", "last_login")
+
+    def get_is_self(self, obj):
+        return obj.pk == self.context["request"].user.pk
+
+    def get_can_edit(self, obj):
+        return can_manage_account(self.context["request"].user, obj)
+
+    def validate(self, attrs):
+        actor = self.context["request"].user
+        target = self.instance
+        is_self = target is not None and target.pk == actor.pk
+        if "is_active" in attrs and not attrs["is_active"] and is_self:
+            raise serializers.ValidationError({"is_active": "Você não pode bloquear a própria conta."})
+        current_superuser = target.is_superuser if target else False
+        if attrs.get("is_superuser", current_superuser) != current_superuser:
+            if not actor.is_superuser:
+                raise serializers.ValidationError(
+                    {"is_superuser": "Apenas superusuários podem conceder ou remover acesso total."}
+                )
+            if is_self:
+                raise serializers.ValidationError(
+                    {"is_superuser": "Você não pode alterar o próprio nível de acesso."}
+                )
+        return attrs
+
+    def update(self, instance, validated_data):
+        if "is_superuser" in validated_data and validated_data["is_superuser"] != instance.is_superuser:
+            instance.is_staff = validated_data["is_superuser"]
+        return super().update(instance, validated_data)
+
+
+class AdminCreateSerializer(AdminUserSerializer):
+    password = serializers.CharField(write_only=True, min_length=6, max_length=128)
+    full_name = serializers.CharField(max_length=150)
+
+    class Meta(AdminUserSerializer.Meta):
+        fields = ("username", "password", "full_name", "email", "phone", "is_superuser")
+        read_only_fields = ()
+
+    def create(self, validated_data):
+        password = validated_data.pop("password")
+        is_superuser = validated_data.pop("is_superuser", False)
+        user = User(
+            **validated_data, role=User.Role.ADMIN, is_superuser=is_superuser, is_staff=is_superuser
+        )
+        user.set_password(password)
+        user.save()
+        return user
+
+
 class WalletOperationSerializer(serializers.Serializer):
     operation = serializers.ChoiceField(choices=[("credit", "Crédito"), ("debit", "Débito")])
     amount = serializers.DecimalField(

@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useAuth } from './AuthContext'
 import { AdminLayout } from './pages/admin/AdminLayout'
+import { AdminsPage } from './pages/admin/AdminsPage'
 import { ClientDetailPage } from './pages/admin/ClientDetailPage'
 import { ClientsPage } from './pages/admin/ClientsPage'
 import { DriversPage } from './pages/admin/DriversPage'
@@ -93,6 +94,7 @@ export default function App() {
           <Route path="motoristas" element={<DriversPage />} />
           <Route path="pix" element={<PixPage />} />
           <Route path="landing" element={<LandingEditorPage />} />
+          <Route path="administradores" element={<AdminsPage />} />
         </Route>
         <Route
           path="/corridas"

@@ -9,6 +9,8 @@ urlpatterns = [
     path("clients/<int:pk>/wallet/", views.ClientWalletView.as_view(), name="admin-client-wallet"),
     path("drivers/", views.DriverListCreateView.as_view(), name="admin-drivers"),
     path("drivers/<int:pk>/", views.DriverDetailView.as_view(), name="admin-driver-detail"),
+    path("admins/", views.AdminUserListCreateView.as_view(), name="admin-admins"),
+    path("admins/<int:pk>/", views.AdminUserDetailView.as_view(), name="admin-admin-detail"),
     path("users/<int:pk>/password/", views.UserSetPasswordView.as_view(), name="admin-user-password"),
     path(
         "users/<int:pk>/password-email/",

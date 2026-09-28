@@ -6,6 +6,7 @@ const TABS = [
   { to: '/painel/motoristas', label: 'Motoristas' },
   { to: '/painel/pix', label: 'PIX e pagamentos' },
   { to: '/painel/landing', label: 'Landing page' },
+  { to: '/painel/administradores', label: 'Administradores' },
 ]
 
 export function AdminLayout() {

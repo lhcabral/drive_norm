@@ -1,0 +1,7 @@
+Deploy concluído.
+
+Instalação concluída. Próximos passos:
+  1) Com o DNS já apontando para este servidor, gere o HTTPS:
+     sudo certbot --nginx -d drivenorm.com.br -d www.drivenorm.com.br -d app.drivenorm.com.br
+  2) Crie o administrador (veja deploy/DEPLOY.md, seção 'Criar o administrador').
+

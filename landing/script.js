@@ -70,7 +70,7 @@ async function fetchContent() {
 function applyContent(content) {
   document.title = content.general.page_title
   document.querySelector('meta[name="description"]')?.setAttribute('content', content.general.meta_description)
-  CONFIG.appUrl = content.general.app_url
+  CONFIG.appUrl = content.general.app_url || CONFIG.appUrl
   CONFIG.whatsapp = content.general.whatsapp_number
   CONFIG.exampleStartBalance = content.examples.start_balance
   CONFIG.exampleRides = content.examples.rides

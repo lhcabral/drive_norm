@@ -107,6 +107,7 @@ export type LandingAdminData = {
   content: LandingContent
   defaults: LandingContent
   customized: string[]
+  automatic: Record<string, string>
   updated_at: string
   updated_by: string | null
 }

@@ -1,6 +1,7 @@
 import copy
 import re
 
+from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import URLValidator
 from rest_framework.exceptions import ValidationError
@@ -22,7 +23,7 @@ def _validate_field(name: str, value: str, path: str) -> None:
         raise ValidationError({path: "O caminho deve começar com /."})
     if name == "whatsapp_number" and not re.fullmatch(r"\d{10,15}", value):
         raise ValidationError({path: "Use apenas dígitos, com DDI e DDD (ex.: 5584999999999)."})
-    if name == "app_url" or (name in IMAGE_FIELDS and "://" in value):
+    if (name == "app_url" and value) or (name in IMAGE_FIELDS and "://" in value):
         try:
             _url_validator(value)
         except DjangoValidationError:
@@ -57,6 +58,8 @@ def _clean(value, default, path: str, name: str, strict: bool):
         if not isinstance(value, str):
             return fail("Deve ser um texto.")
         value = value.strip()
+        if name == "app_url":
+            value = value.rstrip("/")
         if len(value) > MAX_TEXT_LENGTH:
             return fail(f"Máximo de {MAX_TEXT_LENGTH} caracteres.")
         try:
@@ -105,3 +108,16 @@ def merged_content(overrides: dict) -> dict:
         else copy.deepcopy(default)
         for section, default in DEFAULT_CONTENT.items()
     }
+
+
+def automatic_values() -> dict:
+    """Valores usados nos campos que o admin deixou vazios."""
+    return {"general.app_url": settings.FRONTEND_URL.rstrip("/")}
+
+
+def public_content(overrides: dict) -> dict:
+    content = merged_content(overrides)
+    for path, value in automatic_values().items():
+        section, key = path.split(".")
+        content[section][key] = content[section][key] or value
+    return content

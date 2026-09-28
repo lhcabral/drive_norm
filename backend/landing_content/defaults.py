@@ -29,7 +29,8 @@ DEFAULT_CONTENT = {
             "Corridas seguras e confortáveis. Pague R$ 100 e receba R$ 120 em créditos "
             "para suas corridas. Parcele em até 5x sem juros no cartão."
         ),
-        "app_url": "http://localhost:5173",
+        # Vazio: a landing usa o FRONTEND_URL do servidor.
+        "app_url": "",
         "whatsapp_number": "5584921601952",
     },
     "header": {

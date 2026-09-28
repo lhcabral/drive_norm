@@ -1,11 +1,13 @@
 import copy
+import importlib
 import io
 import shutil
 import tempfile
 
+from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import override_settings
+from django.test import TestCase, override_settings
 from PIL import Image
 from rest_framework.test import APITestCase
 
@@ -20,11 +22,30 @@ class LandingContentApiTests(APITestCase):
         self.admin = User.objects.create_user("adm", password="x12345", role=User.Role.ADMIN)
         self.driver = User.objects.create_user("drv", password="x12345", role=User.Role.DRIVER)
 
+    def public_defaults(self):
+        expected = copy.deepcopy(DEFAULT_CONTENT)
+        expected["general"]["app_url"] = "https://app.exemplo.com"
+        return expected
+
+    @override_settings(FRONTEND_URL="https://app.exemplo.com/")
     def test_public_endpoint_returns_defaults_without_auth(self):
         response = self.client.get("/api/landing/")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), DEFAULT_CONTENT)
+        self.assertEqual(response.json(), self.public_defaults())
         self.assertEqual(response["Access-Control-Allow-Origin"], "*")
+
+    @override_settings(FRONTEND_URL="https://app.exemplo.com")
+    def test_app_url_empty_uses_server_frontend_url_and_custom_value_wins(self):
+        self.client.force_authenticate(self.admin)
+        admin_data = self.client.get("/api/landing/admin/").json()
+        self.assertEqual(admin_data["content"]["general"]["app_url"], "")
+        self.assertEqual(admin_data["automatic"]["general.app_url"], "https://app.exemplo.com")
+
+        general = copy.deepcopy(DEFAULT_CONTENT["general"])
+        general["app_url"] = "https://outro.exemplo.com/"
+        self.client.put("/api/landing/admin/sections/general/", general, format="json")
+        public = self.client.get("/api/landing/").json()
+        self.assertEqual(public["general"]["app_url"], "https://outro.exemplo.com")
 
     def test_admin_endpoints_require_admin(self):
         self.assertEqual(self.client.get("/api/landing/admin/").status_code, 401)
@@ -33,6 +54,7 @@ class LandingContentApiTests(APITestCase):
         response = self.client.put("/api/landing/admin/sections/hero/", {}, format="json")
         self.assertEqual(response.status_code, 403)
 
+    @override_settings(FRONTEND_URL="https://app.exemplo.com")
     def test_save_section_and_reset_to_default(self):
         self.client.force_authenticate(self.admin)
         hero = copy.deepcopy(DEFAULT_CONTENT["hero"])
@@ -45,7 +67,7 @@ class LandingContentApiTests(APITestCase):
 
         response = self.client.delete("/api/landing/admin/sections/hero/")
         self.assertEqual(response.json()["customized"], [])
-        self.assertEqual(self.client.get("/api/landing/").json(), DEFAULT_CONTENT)
+        self.assertEqual(self.client.get("/api/landing/").json(), self.public_defaults())
 
     def test_reset_all_sections(self):
         self.client.force_authenticate(self.admin)
@@ -99,6 +121,25 @@ class LandingContentApiTests(APITestCase):
         hero = self.client.get("/api/landing/").json()["hero"]
         self.assertEqual(hero["tagline"], DEFAULT_CONTENT["hero"]["tagline"])
         self.assertEqual(hero["badge"], "Ok")
+
+
+class ClearLocalAppUrlMigrationTests(TestCase):
+    def test_clears_only_localhost_app_url(self):
+        migration = importlib.import_module("landing_content.migrations.0002_clear_local_app_url")
+        cases = {
+            "http://localhost:5173": "",
+            "http://127.0.0.1:5173/": "",
+            "https://app.drivenorm.com.br": "https://app.drivenorm.com.br",
+        }
+        for stored, expected in cases.items():
+            with self.subTest(stored=stored):
+                obj = LandingContent.load()
+                obj.overrides = {"general": {"app_url": stored, "whatsapp_number": "5584999999999"}}
+                obj.save()
+                migration.clear_local_app_url(django_apps, None)
+                obj.refresh_from_db()
+                self.assertEqual(obj.overrides["general"]["app_url"], expected)
+                self.assertEqual(obj.overrides["general"]["whatsapp_number"], "5584999999999")
 
 
 class LandingUploadTests(APITestCase):

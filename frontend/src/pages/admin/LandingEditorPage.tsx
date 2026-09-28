@@ -196,6 +196,7 @@ export function LandingEditorPage() {
                   field={field}
                   value={value[field.key]}
                   onChange={(v) => updateField(field.key, v)}
+                  placeholder={data.automatic[`${active}.${field.key}`]}
                 />
               ))}
             </div>
@@ -230,18 +231,23 @@ export function LandingEditorPage() {
   )
 }
 
-type EditorProps<F> = { field: F; value: unknown; onChange: (value: unknown) => void }
+type EditorProps<F> = {
+  field: F
+  value: unknown
+  onChange: (value: unknown) => void
+  placeholder?: string
+}
 
-function FieldEditor({ field, value, onChange }: EditorProps<Field>) {
+function FieldEditor({ field, value, onChange, placeholder }: EditorProps<Field>) {
   if (field.type === 'list') {
     return (
       <ListEditor field={field} value={Array.isArray(value) ? value : []} onChange={onChange} />
     )
   }
-  return <ScalarEditor field={field} value={value} onChange={onChange} />
+  return <ScalarEditor field={field} value={value} onChange={onChange} placeholder={placeholder} />
 }
 
-function ScalarEditor({ field, value, onChange }: EditorProps<ScalarField>) {
+function ScalarEditor({ field, value, onChange, placeholder }: EditorProps<ScalarField>) {
   const id = useId()
   const text = typeof value === 'string' ? value : ''
 
@@ -291,6 +297,7 @@ function ScalarEditor({ field, value, onChange }: EditorProps<ScalarField>) {
           id={id}
           type={field.type === 'url' ? 'url' : 'text'}
           value={text}
+          placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
         />
       )

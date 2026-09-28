@@ -58,7 +58,7 @@ export const LANDING_SECTIONS: SectionSchema[] = [
         key: 'app_url',
         label: 'Endereço do app',
         type: 'url',
-        help: 'Os botões levam para este endereço + /cadastro, /login, /recarregar…',
+        help: 'Deixe vazio para usar automaticamente o endereço do app deste servidor (mostrado em cinza). Os botões levam para este endereço + /cadastro, /login, /recarregar…',
       },
       {
         key: 'whatsapp_number',

@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from accounts.permissions import IsSiteAdmin
 
-from .content import merged_content, validate_section
+from .content import automatic_values, merged_content, public_content, validate_section
 from .defaults import DEFAULT_CONTENT, SECTION_KEYS
 from .models import LandingContent
 
@@ -23,6 +23,7 @@ def admin_payload(obj: LandingContent) -> dict:
         "content": merged_content(obj.overrides),
         "defaults": DEFAULT_CONTENT,
         "customized": obj.customized_sections,
+        "automatic": automatic_values(),
         "updated_at": obj.updated_at,
         "updated_by": obj.updated_by.display_name if obj.updated_by else None,
     }
@@ -36,7 +37,7 @@ class PublicLandingContentView(APIView):
 
     def get(self, request):
         obj = LandingContent.load()
-        response = Response(merged_content(obj.overrides))
+        response = Response(public_content(obj.overrides))
         response["Access-Control-Allow-Origin"] = "*"
         response["Cache-Control"] = "no-cache"
         return response

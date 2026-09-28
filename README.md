@@ -93,6 +93,8 @@ ocultada e ter imagens trocadas por upload.
 - O conteúdo padrão fica em `backend/landing_content/defaults.py` e é o mesmo texto fixo de
   `landing/index.html`, exibido quando a API não responde. Se mudar um, mude o outro.
 - Nos textos longos, `**texto**` vira negrito e `*texto*` itálico.
+- "Endereço do app" (Configurações gerais) vazio faz os botões usarem o `FRONTEND_URL` do `.env`;
+  preencha só se o app estiver em outro endereço.
 - O botão "Ver página" usa `VITE_LANDING_URL` (padrão `http://localhost:8765`).
 - Imagens enviadas vão para `backend/media/` e são servidas pelo Django só com `DJANGO_DEBUG=True`;
   em produção, sirva `/media/` pelo servidor web.
